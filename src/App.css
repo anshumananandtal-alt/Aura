@@ -1,0 +1,144 @@
+.app-shell {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f7f8ff 0%, #eef2ff 100%);
+}
+
+.app-toolbar {
+  padding: 22px 24px;
+  background: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(159, 168, 219, 0.25);
+}
+
+.toolbar-content {
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.toolbar-actions {
+  align-items: center;
+}
+
+.editor-layout {
+  padding: 24px;
+}
+
+.panel-col {
+  margin-bottom: 20px;
+}
+
+.card-panel {
+  padding: 18px;
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(31, 41, 55, 0.06);
+  background: #ffffff;
+  min-height: 540px;
+}
+
+.canvas-frame {
+  height: 720px;
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  gap: 12px;
+  border-radius: 26px;
+}
+
+.canvas-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.canvas-area {
+  position: relative;
+  background: linear-gradient(180deg, #fbfdff 0%, #eef4ff 100%);
+  flex: 1;
+  border-radius: 22px;
+  border: 2px dashed rgba(102, 110, 234, 0.25);
+  overflow: hidden;
+  min-height: 620px;
+}
+
+.canvas-item {
+  position: absolute;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.canvas-item:hover {
+  transform: translateY(-1px);
+}
+
+.canvas-handle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(79, 102, 255, 0.18);
+  cursor: grab;
+  z-index: 20;
+}
+
+.canvas-ghost {
+  pointer-events: none;
+}
+
+.empty-state {
+  display: grid;
+  gap: 14px;
+  place-items: start;
+}
+
+.preview-card {
+  margin-top: 12px;
+}
+
+.preview-pane {
+  margin-top: 16px;
+  min-height: 240px;
+  padding: 12px;
+  border-radius: 18px;
+  background: #f4f6ff;
+  border: 1px solid rgba(79, 102, 255, 0.12);
+  overflow: hidden;
+}
+
+.preview-pane.desktop {
+  min-height: 220px;
+}
+
+.preview-pane.mobile {
+  min-height: 420px;
+}
+
+.preview-pane > div {
+  width: 100%;
+  min-height: 180px;
+}
+
+@media (max-width: 1199px) {
+  .app-toolbar,
+  .editor-layout,
+  .card-panel {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-toolbar {
+    padding: 16px;
+  }
+  .editor-layout {
+    padding: 16px;
+  }
+  .panel-col {
+    margin-bottom: 16px;
+  }
+}
