@@ -3,13 +3,80 @@ import { Box, Paper, Typography } from '@mui/material'
 import Button from '@mui/material/Button'
 import type { AuraCanvasItem } from '../types'
 
+export type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+
+const HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+
+const handleCursor: Record<ResizeHandle, string> = {
+  n: 'ns-resize',
+  s: 'ns-resize',
+  e: 'ew-resize',
+  w: 'ew-resize',
+  ne: 'nesw-resize',
+  sw: 'nesw-resize',
+  nw: 'nwse-resize',
+  se: 'nwse-resize',
+}
+
+const handlePosition = (handle: ResizeHandle): React.CSSProperties => {
+  const offset = -5
+  const styles: React.CSSProperties = { position: 'absolute' }
+  if (handle.includes('n')) styles.top = offset
+  if (handle.includes('s')) styles.bottom = offset
+  if (handle.includes('w')) styles.left = offset
+  if (handle.includes('e')) styles.right = offset
+  if (handle === 'n' || handle === 's') {
+    styles.left = '50%'
+    styles.transform = 'translateX(-50%)'
+  }
+  if (handle === 'e' || handle === 'w') {
+    styles.top = '50%'
+    styles.transform = 'translateY(-50%)'
+  }
+  return styles
+}
+
+const renderResizeHandles = (
+  item: AuraCanvasItem,
+  isSelected: boolean,
+  onItemResizeStart: CanvasPanelProps['onItemResizeStart'],
+) => {
+  if (!isSelected) return null
+  return (
+    <>
+      {HANDLES.map((handle) => (
+        <Box
+          key={handle}
+          className={`resize-handle resize-handle-${handle}`}
+          onMouseDown={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onItemResizeStart(item.id, handle, event)
+          }}
+          sx={{
+            ...handlePosition(handle),
+            width: 10,
+            height: 10,
+            background: '#4f66ff',
+            border: '1.5px solid #fff',
+            borderRadius: '2px',
+            boxShadow: '0 0 0 1px rgba(0,0,0,0.15)',
+            cursor: handleCursor[handle],
+            zIndex: 20,
+          }}
+        />
+      ))}
+    </>
+  )
+}
+
 interface CanvasPanelProps {
   items: AuraCanvasItem[]
   selectedId: string | null
   draggingGhost: { type: AuraCanvasItem['type']; x: number; y: number } | null
   onCanvasClick: () => void
   onItemMouseDown: (itemId: string, event: React.MouseEvent<HTMLElement>) => void
-  
+  onItemResizeStart: (itemId: string, handle: ResizeHandle, event: React.MouseEvent<HTMLElement>) => void
   onItemTextChange: (itemId: string, text: string) => void
   onItemSelect: (itemId: string) => void
   canvasRef: React.Ref<HTMLDivElement>
@@ -21,6 +88,7 @@ export const CanvasPanel = ({
   draggingGhost,
   onCanvasClick,
   onItemMouseDown,
+  onItemResizeStart,
   onItemTextChange,
   onItemSelect,
   canvasRef,
@@ -99,7 +167,7 @@ export const CanvasPanel = ({
                   alt={item.props.alt}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item.props.borderRadius }}
                 />
-                {null}
+                {renderResizeHandles(item, isSelected, onItemResizeStart)}
               </Box>
             )
           }
@@ -125,7 +193,7 @@ export const CanvasPanel = ({
                 }}
               >
                 {item.props.text}
-                {null}
+                {renderResizeHandles(item, isSelected, onItemResizeStart)}
               </Button>
             )
           }
@@ -135,18 +203,25 @@ export const CanvasPanel = ({
               key={item.id}
               className="canvas-item"
               sx={sharedStyles}
-              contentEditable
-              suppressContentEditableWarning
-              spellCheck={false}
-              onInput={(event) => onItemTextChange(item.id, event.currentTarget.textContent ?? '')}
-              onDoubleClick={(event) => event.stopPropagation()}
               onMouseDown={(event) => onItemMouseDown(item.id, event)}
               onClick={(event) => {
                 event.stopPropagation()
                 onItemSelect(item.id)
               }}
             >
-              {item.props.text}
+              <Box
+                component="div"
+                contentEditable
+                suppressContentEditableWarning
+                spellCheck={false}
+                onInput={(event) => onItemTextChange(item.id, event.currentTarget.textContent ?? '')}
+                onDoubleClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+                sx={{ width: '100%', height: '100%', outline: 'none' }}
+              >
+                {item.props.text}
+              </Box>
+              {renderResizeHandles(item, isSelected, onItemResizeStart)}
             </Box>
           )
         })}

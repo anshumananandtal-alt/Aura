@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Container from 'react-bootstrap/Container'
 import Row from 'react-bootstrap/Row'
 import Col from 'react-bootstrap/Col'
-import { Box, Stack, Typography } from '@mui/material'
+import { Box, Stack, Tab, Tabs, Typography } from '@mui/material'
 import Button from '@mui/material/Button'
 import { Undo, Redo, DesktopWindows } from '@mui/icons-material'
 import { PalettePanel } from './components/PalettePanel'
 import { CanvasPanel } from './components/CanvasPanel'
+import type { ResizeHandle } from './components/CanvasPanel'
 import { PropertiesPanel } from './components/PropertiesPanel'
+import { LayersPanel } from './components/LayersPanel'
 import { useHistoryState } from './hooks/useHistoryState'
 import type { AuraCanvasItem, AuraComponentType, EditorState } from './types'
 import { buildHtml } from './lib/htmlSerializer'
@@ -64,7 +66,18 @@ export default function App() {
     startX: number
     startY: number
   } | null>(null)
-  
+  const [resizeState, setResizeState] = useState<{
+    itemId: string
+    handle: ResizeHandle
+    originX: number
+    originY: number
+    originWidth: number
+    originHeight: number
+    startX: number
+    startY: number
+  } | null>(null)
+  const [leftTab, setLeftTab] = useState<'blocks' | 'layers'>('blocks')
+
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const [copyStatus, setCopyStatus] = useState('')
 
@@ -136,6 +149,42 @@ export default function App() {
     [setEditor],
   )
 
+  const updateItemGeometry = useCallback(
+    (itemId: string, geometry: { x: number; y: number; width: number; height: number }) => {
+      setEditor((prev) => ({
+        ...prev,
+        items: prev.items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                x: Math.max(0, geometry.x),
+                y: Math.max(0, geometry.y),
+                width: Math.max(40, geometry.width),
+                height: Math.max(24, geometry.height),
+              }
+            : item,
+        ),
+      }))
+    },
+    [setEditor],
+  )
+
+  const reorderItem = useCallback(
+    (itemId: string, toIndex: number) => {
+      setEditor((prev) => {
+        const fromIndex = prev.items.findIndex((item) => item.id === itemId)
+        if (fromIndex === -1 || fromIndex === toIndex) return prev
+        const items = [...prev.items]
+        const [moved] = items.splice(fromIndex, 1)
+        items.splice(toIndex, 0, moved)
+        // Keep visual stacking (zIndex) consistent with array order so layer order = paint order
+        const restacked = items.map((item, index) => ({ ...item, zIndex: 10 + index }))
+        return { ...prev, items: restacked }
+      })
+    },
+    [setEditor],
+  )
+
   const setDragStart = (type: AuraComponentType, event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
     setIsDraggingPalette(true)
@@ -157,7 +206,21 @@ export default function App() {
     })
   }
 
-  
+  const handleItemResizeStart = (itemId: string, handle: ResizeHandle, event: React.MouseEvent<HTMLElement>) => {
+    const item = editor.items.find((entry) => entry.id === itemId)
+    if (!item) return
+    setSelectedId(itemId)
+    setResizeState({
+      itemId,
+      handle,
+      originX: item.x,
+      originY: item.y,
+      originWidth: item.width,
+      originHeight: item.height,
+      startX: event.clientX,
+      startY: event.clientY,
+    })
+  }
 
   const handleCanvasClick = () => setSelectedId(null)
 
@@ -208,6 +271,8 @@ export default function App() {
     [dragGhost, isDraggingPalette, setEditor],
   )
 
+  console.log('#test', editor);
+
   useEffect(() => {
     const handleMove = (event: MouseEvent) => {
       if (isDraggingPalette) {
@@ -218,7 +283,39 @@ export default function App() {
         const dy = event.clientY - moveState.startY
         updateItemPosition(moveState.itemId, Math.max(0, moveState.originX + dx), Math.max(0, moveState.originY + dy))
       }
-      
+      if (resizeState) {
+        const dx = event.clientX - resizeState.startX
+        const dy = event.clientY - resizeState.startY
+        const { handle, originX, originY, originWidth, originHeight } = resizeState
+
+        let x = originX
+        let y = originY
+        let width = originWidth
+        let height = originHeight
+
+        if (handle.includes('e')) width = originWidth + dx
+        if (handle.includes('s')) height = originHeight + dy
+        if (handle.includes('w')) {
+          width = originWidth - dx
+          x = originX + dx
+        }
+        if (handle.includes('n')) {
+          height = originHeight - dy
+          y = originY + dy
+        }
+
+        // Clamp so the opposite edge can't be dragged past itself
+        if (width < 40) {
+          if (handle.includes('w')) x = originX + originWidth - 40
+          width = 40
+        }
+        if (height < 24) {
+          if (handle.includes('n')) y = originY + originHeight - 24
+          height = 24
+        }
+
+        updateItemGeometry(resizeState.itemId, { x, y, width, height })
+      }
     }
 
     const endDrag = (event: MouseEvent) => {
@@ -230,10 +327,12 @@ export default function App() {
       if (moveState) {
         setMoveState(null)
       }
-      
+      if (resizeState) {
+        setResizeState(null)
+      }
     }
 
-    if (isDraggingPalette || moveState) {
+    if (isDraggingPalette || moveState || resizeState) {
       document.addEventListener('mousemove', handleMove)
       document.addEventListener('mouseup', endDrag)
       return () => {
@@ -241,7 +340,7 @@ export default function App() {
         document.removeEventListener('mouseup', endDrag)
       }
     }
-  }, [handlePaletteDrop, isDraggingPalette, moveState, updateItemPosition, updateItemSize])
+  }, [handlePaletteDrop, isDraggingPalette, moveState, resizeState, updateItemGeometry, updateItemPosition])
 
   const selectedControls = useMemo(() => {
     if (!selectedItem) return null
@@ -298,8 +397,33 @@ export default function App() {
       <Container fluid className="editor-layout">
         <Row>
           <Col xs={12} lg={3} className="panel-col">
-            <Box className="panel card-panel">
-              <PalettePanel onDragStart={setDragStart} />
+            <Box className="panel card-panel" sx={{ p: 0 }}>
+              <Tabs
+                value={leftTab}
+                onChange={(_, value) => setLeftTab(value)}
+                variant="fullWidth"
+                sx={{ borderBottom: '1px solid #e0e0e0', minHeight: 40 }}
+              >
+                <Tab value="blocks" label="Blocks" sx={{ minHeight: 40, textTransform: 'none', fontWeight: 600 }} />
+                <Tab
+                  value="layers"
+                  label={`Layers${editor.items.length ? ` (${editor.items.length})` : ''}`}
+                  sx={{ minHeight: 40, textTransform: 'none', fontWeight: 600 }}
+                />
+              </Tabs>
+              {leftTab === 'blocks' ? (
+                <PalettePanel onDragStart={setDragStart} />
+              ) : (
+                <Box p={2}>
+                  <LayersPanel
+                    items={editor.items}
+                    selectedId={editor.selectedId}
+                    onSelect={setSelectedId}
+                    onRemove={removeItem}
+                    onReorder={reorderItem}
+                  />
+                </Box>
+              )}
             </Box>
           </Col>
 
@@ -312,7 +436,7 @@ export default function App() {
                 canvasRef={canvasRef}
                 onCanvasClick={handleCanvasClick}
                 onItemMouseDown={handleItemMouseDown}
-                
+                onItemResizeStart={handleItemResizeStart}
                 onItemTextChange={handleItemTextChange}
                 onItemSelect={(id) => setSelectedId(id)}
               />
